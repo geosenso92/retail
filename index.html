@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width" />
+
+  <!-- Title and favicon -->
+  <title>Dashboard Location-finder (demo: gym)</title>
+  <link rel="icon" href="data/1-aafea2ea.ico" type="image/ico" />
+
+  <!-- Leaflet and Drawing Tools -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+  <style>
+    html, body {
+      width: 100%; height: 100%; margin: 0; padding: 0;
+      font-family: sans-serif;
+      background: #eee;
+      overflow: hidden;
+    }
+    #header-container {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 80px;
+      background: white;
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      z-index: 1200;
+      user-select: none;
+    }
+    #logo {
+      height: 60px;
+      margin-right: 15px;
+      user-select: none;
+    }
+    #page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #222;
+      user-select: none;
+    }
+    #map {
+      position: absolute;
+      top: 80px;
+      bottom: 0; left: 0; right: 0;
+      background: #eee;
+      z-index: 0;
+    }
+    .control-box {
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: unset;
+      transition: min-height 0.3s, height 0.3s;
+      position: absolute;
+      top: 90px;
+      left: 10px;
+      background: rgba(255,255,255,0.75);
+      padding: 10px 12px 15px 12px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      z-index: 1100;
+      width: 320px;
+      font-size: 12px;
+      user-select: none;
+      gap: 10px;
+    }
+    .control-box.show-stats {
+      min-height: unset;
+    }
+    .control-box-title {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #2C3E83;
+    }
+    .control-box label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 0;
+    }
+    .control-box label span {
+      flex-shrink: 0;
+      width: 38px;
+      text-align: right;
+      font-weight: 600;
+      user-select: none;
+    }
+    .control-box input[type=range] {
+      flex-grow: 1;
+      cursor: pointer;
+      height: 18px;
+      margin-left: 0;
+      margin-right: 0;
+    }
+    #transparency-label {
+      margin-top: 10px;
+      user-select: none;
+    }
+    #reset-btn, #update-btn {
+      margin-top: 6px;
+      width: 100%;
+      padding: 7px;
+      font-size: 12px;
+      background: #2C3E83;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    #update-btn {
+      padding-right: 25px;
+    }
+    #info-icon {
+      position: absolute;
+      top: 50%;
+      right: 5px;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      color: black;
+      font-weight: bold;
+      text-align: center;
+      line-height: 18px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    #info-text {
+      position: absolute;
+      bottom: 100%;
+      right: 0;
+      margin-bottom: 8px;
+      width: 230px;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 7px 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 1150;
+      pointer-events: auto;
+      user-select: none;
+      color: #222;
+      line-height: 1.3;
+    }
+    .legend {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      background: white;
+      font-size: 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      z-index: 1100;
+      width: 180px;
+      line-height: 18px;
+      user-select: none;
+    }
+    .legend-title {
+      font-weight: bold;
+      margin-bottom: 7px;
+      text-align: center;
+    }
+    .legend-scale {
+      display: flex;
+      height: 16px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .legend-scale div {
+      flex: 1;
+    }
+    .color-box {
+      flex: 1;
+      height: 16px;
+    }
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+    }
+    #toggle-menu-btn {
+      position: absolute;
+      top: 90px;
+      left: 10px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      z-index: 1150;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+      display: none;
+      width: 160px;
+      text-align: center;
+    }
+    #legend-info-toggle {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 20px;
+      height: 20px;
+      background: none;
+      color: white;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+      line-height: 20px;
+      cursor: pointer;
+      user-select: none;
+      z-index: 1200;
+    }
+    .legend-info {
+      font-size: 11px;
+      color: #444;
+      margin-top: 4px;
+      line-height: 1.3;
+      display: none;
+    }
+    #legend-toggle {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 20px;
+      height: 20px;
+      background: #eee;
+      color: #333;
+      border-radius: 3px;
+      font-weight: bold;
+      font-size: 16px;
+      text-align: center;
+      line-height: 20px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      z-index: 1200;
+    }
+    .leaflet-control-layers {
+      top: 14px !important;
+      right: 4px !important;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 6px;
+      padding: 6px 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+    #selection-summary {
+      background: #f9f9f9;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+      border: 1px solid #ddd;
+      color: #222;
+    }
+    #export-csv-btn, #export-json-btn {
+      margin-top: 4px;
+      margin-bottom: 2px;
+      padding: 5px 12px;
+      font-size: 12px;
+      background: #2C3E83;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .control-box > #close-menu-btn {
+      margin-top: 8px;
+      margin-bottom: 0;
+    }
+    .leaflet-div-icon.leaflet-editing-icon,
+    .leaflet-div-icon.leaflet-draw-edit-edit,
+    .leaflet-div-icon.leaflet-draw-edit-move {
+      width: 8px !important;
+      height: 8px !important;
+      margin-left: -4px !important;
+      margin-top: -4px !important;
+      border-radius: 2px !important;
+    }
+    .leaflet-div-icon.leaflet-editing-icon {
+      background: #fff;
+      border: 1px solid #333;
+      box-shadow: none;
+    }
+    .leaflet-div-icon.leaflet-draw-edit-move {
+      background: #fff;
+      border: 1px solid #555;
+      box-shadow: none;
+    }
+    #export-csv-btn, #export-json-btn, #selection-summary {
+      display: none;
+    }
+    .control-box.show-stats #export-csv-btn,
+    .control-box.show-stats #export-json-btn,
+    .control-box.show-stats #selection-summary {
+      display: block;
+    }
+    .control-box.show-stats > #selection-summary {
+      margin-bottom: 4px;
+    }
+    .control-box.show-stats > #close-menu-btn {
+      margin-top: 4px;
+    }
+    /* Make area tooltip on draw show km² instead of ha */
+    .leaflet-draw-tooltip-subarea {
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header-container">
+  <img id="logo" src="data/NewLogo21.png" alt="Logo" />
+  <div id="page-title">Dashboard Location-finder (demo: gym)</div>
+</div>
+
+<div class="control-box" id="control-box">
+  <h2 class="control-box-title">Weighting factors (MCA)</h2>
+  <label for="weight-fitness">Proximity gym(s):
+    <input type="range" min="0" max="1" step="0.01" id="weight-fitness" value="0.30" />
+    <span id="percent-fitness">30%</span>
+  </label>
+  <label for="weight-ov">Public transport:
+    <input type="range" min="0" max="1" step="0.01" id="weight-ov" value="0.20" />
+    <span id="percent-ov">20%</span>
+  </label>
+  <label for="weight-pop">Population density:
+    <input type="range" min="0" max="1" step="0.01" id="weight-pop" value="0.50" />
+    <span id="percent-pop">50%</span>
+  </label>
+  <button id="update-btn" type="button">Update suitability index
+    <div id="info-icon">i</div>
+    <div id="info-text">De suitability index is het resultaat van de MCA waarbij verschillende wegingen kunnen worden toegepast.</div>
+  </button>
+  <button id="reset-btn" type="button">Reset</button>
+  <label id="transparency-label" for="transparency-slider">Raster transparency:
+    <input type="range" min="0" max="1" step="0.01" id="transparency-slider" value="0.5" />
+    <span id="percent-transparency">50%</span>
+  </label>
+  <button id="export-csv-btn" type="button">Export CSV</button>
+  <button id="export-json-btn" type="button">Export JSON</button>
+  <div id="selection-summary"></div>
+  <button id="close-menu-btn" type="button">Minimaliseer menu</button>
+</div>
+
+<button id="toggle-menu-btn">Open locatievinder menu</button>
+
+<div id="map"></div>
+
+<div class="legend" id="legend">
+  <div id="legend-info-toggle" title="De suitability index is het resultaat van de factoren waarbij verschillende wegingen kunnen worden toegepast. 0 = niet geschikt | 10 = uiterst geschikt">ℹ️</div>
+  <div id="legend-toggle" title="Toggle legend">−</div>
+  <div class="legend-title" style="font-size: 14px; text-align: center; margin-bottom: 5px;">Legend</div>
+  <div class="legend-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <span class="legend-title">Suitability index</span>
+  </div>
+  <div class="legend-bar legend-scale">
+    <div class="color-box" style="background:#d73027"></div>
+    <div class="color-box" style="background:#f46d43"></div>
+    <div class="color-box" style="background:#fdae61"></div>
+    <div class="color-box" style="background:#fee08b"></div>
+    <div class="color-box" style="background:#d9ef8b"></div>
+    <div class="color-box" style="background:#a6d96a"></div>
+    <div class="color-box" style="background:#1a9641"></div>
+  </div>
+  <div class="legend-labels">
+    <span class="legend-label-left">0 </span>
+    <span class="legend-label-right">10</span>
+  </div>
+  <div class="legend-info" id="legend-info" style="display: none;">
+    De suitability index is het resultaat van de factoren waarbij verschillende wegingen kunnen worden toegepast. 0 = niet geschikt | 10 = uiterst geschikt
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+  // Change URL bar title (if user navigates directly via url)
+  document.title = "Dashboard Location-finder (demo: fitnesscenter)";
+
+  // Info icon logic
+  const infoIcon = document.getElementById('info-icon');
+  const infoText = document.getElementById('info-text');
+  infoIcon.addEventListener('click', () => {
+    infoText.style.display = infoText.style.display === 'block' ? 'none' : 'block';
+  });
+  document.addEventListener('click', e => {
+    if (!infoIcon.contains(e.target) && !infoText.contains(e.target)) {
+      infoText.style.display = 'none';
+    }
+  });
+
+  function getCenterCoords() {
+    if (window.innerWidth <= 768) {
+      return [52.10, 5.10];
+    } else {
+      return [52.09, 5.42];
+    }
+  }
+
+  const map = L.map('map', {
+    zoomControl: false,
+    minZoom: 11,
+    maxZoom: 18,
+    maxBounds: [
+      [51.90, 4.75],
+      [52.28, 5.35]
+    ],
+    maxBoundsViscosity: 1.0,
+    zoomSnap: 0.5,
+    zoomDelta: 0.5
+  }).setView(getCenterCoords(), 12);
+
+  map.setZoom(map.getZoom() - 0.5);
+
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  L.control.scale({ position: 'bottomright' }).addTo(map);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  function getColor(score) {
+    return score > 6 ? '#1a9641' :
+           score > 4 ? '#a6d96a' :
+           score > 2 ? '#fdae61' :
+                       '#d7191c';
+  }
+
+  let currentTransparency = 0.5;
+
+  function styleFeature(feature) {
+    return {
+      fillColor: getColor(feature.properties.MCA_score || 0),
+      weight: 0.3,
+      color: '#555',
+      fillOpacity: currentTransparency
+    };
+  }
+
+  function highlightFeature(e) {
+    const layer = e.target;
+    layer.setStyle({ weight: 2, color: '#666' });
+  }
+
+  function resetHighlight(e) {
+    layer_group.resetStyle(e.target);
+  }
+
+  function popFeature(feature, layer) {
+    layer.on({
+      mouseover: highlightFeature,
+      mouseout: resetHighlight
+    });
+    layer.bindPopup('Suitability index: ' + ((feature.properties.MCA_score || 0).toFixed(2)));
+  }
+
+  let layer_group;
+
+  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/' +
+    'World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles © Esri'
+  });
+
+  const overlays = {
+    "Satelliet": satelliteLayer
+  };
+
+  L.control.layers(null, overlays, { position: 'topright' }).addTo(map);
+
+  fetch('data/gridlayer_mca_fitness.geojson')
+    .then(res => res.json())
+    .then(data => {
+      layer_group = L.geoJSON(data, {
+        style: styleFeature,
+        onEachFeature: popFeature
+      }).addTo(map);
+      updateScores();
+    })
+    .catch(e => {
+      alert("Fout bij het laden van GeoJSON: " + e);
+    });
+
+  function updateScores() {
+    let w_ov = parseFloat(document.getElementById('weight-ov').value) || 0;
+    let w_fit = parseFloat(document.getElementById('weight-fitness').value) || 0;
+    let w_pop = parseFloat(document.getElementById('weight-pop').value) || 0;
+
+    // Normalisatie
+    const sum = w_ov + w_fit + w_pop;
+    if (sum > 0) {
+      w_ov /= sum;
+      w_fit /= sum;
+      w_pop /= sum;
+    } else {
+      w_ov = 0.2; w_fit = 0.3; w_pop = 0.5;
+    }
+
+    // Sliders en percentages
+    document.getElementById('weight-ov').value = w_ov.toFixed(3);
+    document.getElementById('percent-ov').textContent = Math.round(w_ov * 100) + '%';
+
+    document.getElementById('weight-fitness').value = w_fit.toFixed(3);
+    document.getElementById('percent-fitness').textContent = Math.round(w_fit * 100) + '%';
+
+    document.getElementById('weight-pop').value = w_pop.toFixed(3);
+    document.getElementById('percent-pop').textContent = Math.round(w_pop * 100) + '%';
+
+    if (layer_group) {
+      layer_group.eachLayer(layer => {
+        const p = layer.feature.properties;
+        const ov = parseFloat(p.score_bus) || 0;
+        const fit = parseFloat(p.score_fit) || 0;
+        const pop = parseFloat(p.score_pop) || 0;
+        p.MCA_score = w_ov * ov + w_fit * fit + w_pop * pop;
+
+        layer.setStyle(styleFeature(layer.feature));
+        layer.bindPopup('Suitability index: ' + p.MCA_score.toFixed(2));
+      });
+    }
+  }
+
+  function updatePercentDisplay(idRange, idPercent) {
+    const range = document.getElementById(idRange);
+    const percent = document.getElementById(idPercent);
+    range.addEventListener('input', () => {
+      percent.textContent = Math.round(parseFloat(range.value) * 100) + '%';
+    });
+  }
+  updatePercentDisplay('weight-fitness', 'percent-fitness');
+  updatePercentDisplay('weight-ov', 'percent-ov');
+  updatePercentDisplay('weight-pop', 'percent-pop');
+  updatePercentDisplay('transparency-slider', 'percent-transparency');
+
+  document.getElementById('transparency-slider').addEventListener('input', e => {
+    currentTransparency = parseFloat(e.target.value);
+    document.getElementById('percent-transparency').textContent = Math.round(currentTransparency * 100) + '%';
+    if (layer_group) {
+      layer_group.setStyle(layer => ({
+        ...styleFeature(layer.feature)
+      }));
+    }
+  });
+
+  document.getElementById('update-btn').addEventListener('click', () => {
+    updateScores();
+  });
+
+  // --- CLEAR SELECTION LOGIC ---
+  function clearSelectionAndStats() {
+    drawnItems.clearLayers();
+    selectedFeatures = [];
+    document.getElementById('selection-summary').innerHTML = '';
+    controlBox.classList.remove('show-stats');
+    // Reset all grid cells style to normal (remove highlight)
+    if (layer_group) {
+      layer_group.eachLayer(function (featureLayer) {
+        featureLayer.setStyle(styleFeature(featureLayer.feature));
+      });
+    }
+  }
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    document.getElementById('weight-fitness').value = 0.3;
+    document.getElementById('weight-ov').value = 0.2;
+    document.getElementById('weight-pop').value = 0.5;
+    document.getElementById('transparency-slider').value = 0.5;
+
+    document.getElementById('percent-fitness').textContent = '30%';
+    document.getElementById('percent-ov').textContent = '20%';
+    document.getElementById('percent-pop').textContent = '50%';
+    document.getElementById('percent-transparency').textContent = '50%';
+
+    currentTransparency = 0.5;
+    if (layer_group) {
+      layer_group.setStyle(layer => ({
+        ...styleFeature(layer.feature)
+      }));
+    }
+    updateScores();
+
+    // Clear selection and statistics, shrink control box
+    clearSelectionAndStats();
+  });
+
+  const controlBox = document.getElementById('control-box');
+  const toggleMenuBtn = document.getElementById('toggle-menu-btn');
+  const closeMenuBtn = document.getElementById('close-menu-btn');
+
+  closeMenuBtn.addEventListener('click', () => {
+    controlBox.style.display = 'none';
+    toggleMenuBtn.style.display = 'block';
+  });
+
+  toggleMenuBtn.addEventListener('click', () => {
+    controlBox.style.display = 'flex';
+    toggleMenuBtn.style.display = 'none';
+  });
+
+  controlBox.style.display = 'flex';
+
+  document.getElementById('legend-info-toggle').addEventListener('click', function () {
+    const info = document.getElementById('legend-info');
+    if (info.style.display === 'none') {
+      info.style.display = 'block';
+      this.title = 'Verberg uitleg';
+    } else {
+      info.style.display = 'none';
+      this.title = 'Toon uitleg';
+    }
+  });
+
+  document.getElementById('legend-toggle').addEventListener('click', function () {
+    const legend = document.getElementById('legend');
+    if (legend.style.height === '30px') {
+      legend.style.height = '';
+      this.textContent = '−';
+      this.title = 'Minimaliseer legenda';
+    } else {
+      legend.style.height = '30px';
+      this.textContent = '+';
+      this.title = 'Maximaliseer legenda';
+    }
+  });
+
+  fetch('https://raw.githubusercontent.com/geosenso92/fitness-locator-map/main/data/gemkaart24.json')
+    .then(response => response.json())
+    .then(gemeenteData => {
+      const gemeenteLayer = L.geoJSON(gemeenteData, {
+        filter: feature => feature.properties.gemeentenaam !== "Utrecht",
+        style: {
+          color: "#555",
+          weight: 1,
+          fillColor: "#f7f7f7",
+          fillOpacity: 0.3
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindTooltip(feature.properties.gemeentenaam, {
+            sticky: true
+          });
+          layer.on({
+            mouseover: function (e) {
+              e.target.setStyle({
+                weight: 2,
+                color: '#000',
+                fillOpacity: 0.5
+              });
+              e.target.openTooltip();
+            },
+            mouseout: function (e) {
+              gemeenteLayer.resetStyle(e.target);
+              e.target.closeTooltip();
+            }
+          });
+        }
+      }).addTo(map);
+    })
+    .catch(error => {
+      console.error("Fout bij het laden van gemeentekaart:", error);
+    });
+
+  const drawnItems = new L.FeatureGroup().addTo(map);
+
+  // --- CUSTOM AREA FORMAT FOR DRAW TOOLTIP ---
+  // Patch Leaflet.Draw's area display to show km² instead of ha in tooltips
+  // (Override the formatArea method)
+  var LDraw = window.L.Draw ? window.L.Draw : window.L.draw;
+  if (LDraw && LDraw.Tooltip && LDraw.Tooltip.prototype) {
+    LDraw.Tooltip.prototype._formatArea = function(area) {
+      // area in m2
+      var km2 = area / 1e6;
+      return km2.toLocaleString('nl-NL', {maximumFractionDigits: 2}) + ' km²';
+    }
+  }
+
+  // Set up drawing control
+  const drawControl = new L.Control.Draw({
+    position: "bottomright",
+    edit: {
+      featureGroup: drawnItems,
+      edit: false,
+      remove: true
+    },
+    draw: {
+      polygon: true,
+      rectangle: true,
+      polyline: false,
+      circle: false,
+      marker: false,
+      circlemarker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  function exportSelectedAsCSV(selected) {
+    if (!selected.length) return;
+    let csv = "id,MCA_score,area_km2\n";
+    selected.forEach((f, i) => {
+      const areaSqMeters = turf.area(f);
+      const areaKm2 = areaSqMeters / 1e6;
+      csv += (f.properties.id || i) + "," + (f.properties.MCA_score || 0) + "," + areaKm2.toFixed(1) + "\n";
+    });
+    let blob = new Blob([csv], {type: "text/csv"});
+    let url = URL.createObjectURL(blob);
+    let link = document.createElement('a');
+    link.href = url;
+    link.download = 'selected_gridcells.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function exportSelectedAsJSON(selected) {
+    let data = selected.map((f, i) => {
+      const areaSqMeters = turf.area(f);
+      const areaKm2 = areaSqMeters / 1e6;
+      return {
+        ...f.properties,
+        area_km2: +areaKm2.toFixed(1)
+      };
+    });
+    let blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    let url = URL.createObjectURL(blob);
+    let link = document.createElement('a');
+    link.href = url;
+    link.download = 'selected_gridcells.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  let selectedFeatures = [];
+
+  map.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    drawnItems.clearLayers();
+    drawnItems.addLayer(layer);
+
+    const drawnGeoJSON = layer.toGeoJSON();
+    const selected = [];
+    let totalScore = 0;
+    let totalAreaSqMeters = 0;
+    if (layer_group) {
+      layer_group.eachLayer(function (featureLayer) {
+        const feature = featureLayer.toGeoJSON();
+        if (turf.booleanIntersects(drawnGeoJSON, feature)) {
+          selected.push(feature);
+          featureLayer.setStyle({
+            color: 'red',
+            weight: 2,
+            fillOpacity: 0.8,
+          });
+          totalScore += feature.properties.MCA_score || 0;
+          totalAreaSqMeters += turf.area(feature);
+        } else {
+          featureLayer.setStyle(styleFeature(featureLayer.feature));
+        }
+      });
+    }
+    selectedFeatures = selected;
+
+    const count = selected.length;
+    const meanScore = count ? (totalScore / count) : 0;
+    const areaKm2 = totalAreaSqMeters / 1e6;
+
+    if(count > 0){
+      controlBox.classList.add('show-stats');
+      document.getElementById('selection-summary').innerHTML =
+        `Aantal geselecteerde cellen: ${count}<br>
+        Totale oppervlakte: ${areaKm2.toFixed(1)} km²<br>
+        Gemiddelde MCA_score: ${meanScore.toFixed(2)}`;
+    } else {
+      clearSelectionAndStats();
+    }
+  });
+
+  // Catch draw:deleted event (trash bin and programmatic deletes)
+  map.on('draw:deleted', function() {
+    clearSelectionAndStats();
+  });
+
+  document.getElementById('export-csv-btn').addEventListener('click', () => {
+    exportSelectedAsCSV(selectedFeatures);
+  });
+  document.getElementById('export-json-btn').addEventListener('click', () => {
+    exportSelectedAsJSON(selectedFeatures);
+  });
+</script>
+
+</body>
+</html>
